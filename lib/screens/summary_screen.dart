@@ -16,11 +16,27 @@ class _SummaryScreenState extends State<SummaryScreen> {
 
   Future<CurrentStats> currentStats;
   Future<CovidSummary> covidSummary;
+  String filterText;
+  TextEditingController searchController = new TextEditingController();
 
   @override
   void initState() {
+    super.initState();
     covidSummary = fetchCovidSummary();
     currentStats = fetchCurrentStats();
+    searchController.addListener(search);
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  void search() {
+    setState(() {
+      filterText = searchController.text;
+    });
   }
 
   @override
@@ -33,6 +49,7 @@ class _SummaryScreenState extends State<SummaryScreen> {
             padding: EdgeInsets.all(8.0),
             height: double.infinity,
             child: SingleChildScrollView(
+              physics: NeverScrollableScrollPhysics(),
               child: Column(
                 children: <Widget>[
                   buildSearchBar(context),
@@ -135,9 +152,10 @@ class _SummaryScreenState extends State<SummaryScreen> {
           borderRadius: BorderRadius.circular(10.0),
         ),
         child: TextField(
+          controller: searchController,
           decoration: InputDecoration(
               border: InputBorder.none,
-              prefixIcon: Icon(Icons.search),
+              prefixIcon: Icon(Icons.search, color: Colors.grey, size: 23),
               hintText: "Search Country"),
         ),
       ),
@@ -165,7 +183,13 @@ class _SummaryScreenState extends State<SummaryScreen> {
     );
   }
 
-  Widget _buildCountryListHelper(BuildContext context, items) {
+  Widget _buildCountryListHelper(BuildContext context, List<Current> items) {
+    if (filterText != "" && filterText != null) {
+      items = items
+          .where((item) =>
+              item.location.toLowerCase().contains(filterText.toLowerCase()))
+          .toList();
+    }
     return ListView.builder(
       itemCount: items.length,
       itemBuilder: (context, index) {
