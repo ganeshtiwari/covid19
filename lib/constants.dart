@@ -1,0 +1,1 @@
+const APPTITLE = "COVID-19";
