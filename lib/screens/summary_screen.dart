@@ -2,6 +2,7 @@ import 'package:covid19/models/current.dart';
 import 'package:covid19/models/covid_summary.dart';
 import 'package:covid19/service/covid_service.dart';
 import "package:flutter/material.dart";
+import "package:pull_to_refresh/pull_to_refresh.dart";
 import 'dart:async' show Future;
 
 class SummaryScreen extends StatefulWidget {
@@ -12,12 +13,12 @@ class SummaryScreen extends StatefulWidget {
 }
 
 class _SummaryScreenState extends State<SummaryScreen> {
-  bool isSearching = false;
-
   Future<CurrentStats> currentStats;
   Future<CovidSummary> covidSummary;
   String filterText;
-  TextEditingController searchController = new TextEditingController();
+
+  TextEditingController searchController = TextEditingController();
+  final RefreshController refreshController = RefreshController();
 
   @override
   void initState() {
@@ -42,20 +43,31 @@ class _SummaryScreenState extends State<SummaryScreen> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: "test",
+      title: "Covid19",
       home: Scaffold(
         body: SafeArea(
           child: Container(
             padding: EdgeInsets.all(8.0),
             height: double.infinity,
-            child: SingleChildScrollView(
-              physics: NeverScrollableScrollPhysics(),
-              child: Column(
-                children: <Widget>[
-                  buildSearchBar(context),
-                  buildWorldSummaryContainer(context),
-                  buildCountryList(context),
-                ],
+            child: SmartRefresher(
+              controller: refreshController,
+              enablePullDown: true,
+              onRefresh: () async {
+                setState(() {
+                  covidSummary = fetchCovidSummary();
+                  currentStats = fetchCurrentStats();
+                });
+                refreshController.refreshCompleted();
+              },
+              child: SingleChildScrollView(
+                // physics: NeverScrollableScrollPhysics(),
+                child: Column(
+                  children: <Widget>[
+                    buildSearchBar(context),
+                    buildWorldSummaryContainer(context),
+                    buildCountryList(context),
+                  ],
+                ),
               ),
             ),
           ),
@@ -190,7 +202,9 @@ class _SummaryScreenState extends State<SummaryScreen> {
               item.location.toLowerCase().contains(filterText.toLowerCase()))
           .toList();
     }
+    print("Length ${items.length}");
     return ListView.builder(
+      scrollDirection: Axis.vertical,
       itemCount: items.length,
       itemBuilder: (context, index) {
         return ExpansionTile(
@@ -202,59 +216,46 @@ class _SummaryScreenState extends State<SummaryScreen> {
             ),
           ),
           children: <Widget>[
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0),
-              child: Container(
-                padding: EdgeInsets.only(bottom: 8.0),
-                alignment: Alignment.topLeft,
-                child: Column(
-                  children: <Widget>[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: <Widget>[
-                        Text(
-                          "Confirmed:",
-                          style: subHeadingStyle,
-                        ),
-                        Text(
-                          items[index].confirmed.toString(),
-                          style: subHeadingStyle,
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: <Widget>[
-                        Text(
-                          "Recovered:",
-                          style: subHeadingStyle,
-                        ),
-                        Text(
-                          items[index].recovered.toString(),
-                          style: subHeadingStyle,
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: <Widget>[
-                        Text(
-                          "Deaths:",
-                          style: subHeadingStyle,
-                        ),
-                        Text(
-                          items[index].deaths.toString(),
-                          style: subHeadingStyle,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+            Container(
+              padding: EdgeInsets.only(bottom: 8.0, left: 16.0, right: 16.0),
+              alignment: Alignment.topLeft,
+              child: Column(
+                children: <Widget>[
+                  subHeaderRow(
+                      "Confirmed:", items[index].confirmed.toString()),
+                  subHeaderRow(
+                      "Recoverd:", items[index].recovered.toString()),
+                  subHeaderRow("Deaths:", items[index].deaths.toString()),
+                  subHeaderRow(
+                      "Recovery rate:",
+                      getPercent(
+                          items[index].confirmed, items[index].recovered)),
+                  subHeaderRow(
+                      "Death rate:",
+                      getPercent(
+                          items[index].confirmed, items[index].deaths)),
+                ],
               ),
             ),
           ],
         );
       },
+    );
+  }
+
+  Widget subHeaderRow(String title, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: <Widget>[
+        Text(
+          title,
+          style: subHeadingStyle,
+        ),
+        Text(
+          value,
+          style: subHeadingStyle,
+        ),
+      ],
     );
   }
 }
@@ -263,3 +264,8 @@ const TextStyle subHeadingStyle = TextStyle(
   color: Colors.grey,
   fontSize: 12.0,
 );
+
+String getPercent(total, amount) {
+  double percent = (amount / total) * 100;
+  return percent.toStringAsFixed(2);
+}
